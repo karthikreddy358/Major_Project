@@ -9,7 +9,7 @@ import PatientProfile from './pages/PatientProfile'
 import ProjectInfo from './pages/ProjectInfo'
 import Reports from './pages/Reports'
 import RiskMonitoring from './pages/RiskMonitoring'
-import { AlertRecord, DashboardStats, hasSession, logout, loadDashboard, PredictionRecord } from './services/api'
+import { AlertRecord, DashboardStats, hasSession, logout, loadDashboard, PredictionRecord, validateSession } from './services/api'
 
 type DashboardData = { stats: DashboardStats; alerts: AlertRecord[]; featuredPredictions: PredictionRecord[] }
 
@@ -28,12 +28,21 @@ function Dashboard({ data, apiError }: { data: DashboardData | null; apiError: b
 }
 
 function App() {
-  const [authenticated, setAuthenticated] = useState(hasSession())
+  const [authenticated, setAuthenticated] = useState(false)
+  const [sessionChecked, setSessionChecked] = useState(false)
   const [dashboard, setDashboard] = useState<DashboardData | null>(null)
   const [apiError, setApiError] = useState(false)
   const [view, setView] = useState(window.location.hash.slice(1) || 'dashboard')
+  useEffect(() => {
+    const onUnauthorized = () => { logout(); setAuthenticated(false); setDashboard(null) }
+    window.addEventListener('maternasense:unauthorized', onUnauthorized)
+    if (!hasSession()) setSessionChecked(true)
+    else validateSession().then(() => setAuthenticated(true)).catch(() => logout()).finally(() => setSessionChecked(true))
+    return () => window.removeEventListener('maternasense:unauthorized', onUnauthorized)
+  }, [])
   useEffect(() => { if (authenticated) loadDashboard().then(setDashboard).catch(() => setApiError(true)) }, [authenticated])
   useEffect(() => { const onHashChange = () => setView(window.location.hash.slice(1) || 'dashboard'); window.addEventListener('hashchange', onHashChange); return () => window.removeEventListener('hashchange', onHashChange) }, [])
+  if (!sessionChecked) return <main className="login-page"><div className="empty-state">Checking your session...</div></main>
   if (!authenticated) return <Login onLogin={() => setAuthenticated(true)} />
   const page = view === 'patients' ? <PatientDirectory /> : view.startsWith('patient/') ? <PatientProfile id={Number(view.split('/')[1])} /> : view === 'risk' ? <RiskMonitoring /> : view === 'alerts' ? <Alerts /> : view === 'performance' ? <ModelPerformance /> : view === 'reports' ? <Reports /> : view === 'architecture' ? <Architecture /> : view === 'info' ? <ProjectInfo /> : <Dashboard data={dashboard} apiError={apiError} />
   return <div className="app-shell"><aside className="sidebar"><div className="brand"><span className="brand-mark"><Activity size={18} /></span><span>MaternaSense</span></div><p className="eyebrow">Continuity intelligence</p><nav aria-label="Primary navigation"><a className="nav-item" href="#dashboard"><LayoutDashboard size={17} />Dashboard</a><a className="nav-item" href="#patients"><Users size={17} />Patients</a><a className="nav-item" href="#risk"><Activity size={17} />Risk monitoring</a><a className="nav-item" href="#alerts"><Bell size={17} />Alerts</a><a className="nav-item" href="#performance"><BarChart3 size={17} />Model performance</a><a className="nav-item" href="#reports"><FileText size={17} />Reports</a><a className="nav-item" href="#architecture"><Network size={17} />Architecture</a><a className="nav-item" href="#info"><Info size={17} />Project information</a></nav><div className="sidebar-note"><span className="status-dot" />Connected workspace<br /><small>Continuity records</small></div></aside><main className="main-content"><header className="topbar"><div><p className="eyebrow">Care continuity workspace</p></div><div className="user-chip"><span className="avatar">CW</span><span><strong>Healthcare worker</strong><small>Signed-in workspace</small></span><button className="logout-button" aria-label="Log out" onClick={() => { logout(); setAuthenticated(false) }}><LogOut size={15} /></button></div></header>{page}<footer className="disclaimer">Research / educational decision support · Not a Medical Diagnosis · Review all records with professional judgment.</footer></main></div>

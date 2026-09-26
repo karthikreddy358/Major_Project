@@ -1,19 +1,15 @@
 import { BarChart3, Database, ShieldAlert } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import axios from 'axios'
+import { loadModelPerformance } from '../services/api'
 
 type ModelResult = { name: string; status?: string; accuracy?: number; precision?: number; recall?: number; f1?: number; roc_auc?: number; note?: string }
-const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000/api'
-
 export default function ModelPerformance() {
   const [models, setModels] = useState<{ baseline: ModelResult; sequential: ModelResult } | null>(null)
   const [error, setError] = useState('')
   useEffect(() => {
     async function load() {
       try {
-        const login = await axios.post(`${API_URL}/auth/login`, { email: 'demo@maternasense.local', password: 'demo-password' })
-        const response = await axios.get(`${API_URL}/model/performance`, { headers: { Authorization: `Bearer ${login.data.access_token as string}` } })
-        setModels(response.data)
+        setModels(await loadModelPerformance())
       } catch { setError('Model performance is unavailable until the API is running.') }
     }
     void load()

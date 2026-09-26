@@ -4,7 +4,13 @@ const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000/api',
 })
 
-api.interceptors.response.use((response) => response)
+api.interceptors.response.use((response) => response, (error) => {
+  if (error.response?.status === 401 && localStorage.getItem('maternasense_token')) {
+    localStorage.removeItem('maternasense_token')
+    window.dispatchEvent(new Event('maternasense:unauthorized'))
+  }
+  return Promise.reject(error)
+})
 
 export type DashboardStats = {
   total_mothers: number
@@ -44,6 +50,15 @@ export async function login(email: string, password: string) {
 
 export function logout() { localStorage.removeItem('maternasense_token') }
 export function hasSession() { return Boolean(localStorage.getItem('maternasense_token')) }
+
+export async function validateSession() {
+  await api.get('/auth/me', await authConfig())
+}
+
+export async function loadModelPerformance() {
+  const response = await api.get('/model/performance', await authConfig())
+  return response.data
+}
 
 export async function loadDashboard() {
   const config = await authConfig()
